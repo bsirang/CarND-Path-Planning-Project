@@ -9,6 +9,8 @@
 #include "json.hpp"
 #include "spline.h"
 
+#include "path_planner.hpp"
+
 // for convenience
 using nlohmann::json;
 using std::string;
@@ -27,7 +29,8 @@ int main() {
   // Waypoint map to read from
   string map_file_ = "../data/highway_map.csv";
   // The max s value before wrapping around the track back to 0
-  double max_s = 6945.554;
+  static constexpr double max_s = 6945.554;
+  static constexpr double delta_t = 0.02; // time interval in between simulator updates (50Hz)
 
   std::ifstream in_map_(map_file_.c_str(), std::ifstream::in);
 
@@ -50,9 +53,15 @@ int main() {
     map_waypoints_dx.push_back(d_x);
     map_waypoints_dy.push_back(d_y);
   }
+  PathPlanner::points_2d_t map_xy{map_waypoints_x, map_waypoints_y};
+  PathPlanner::points_2d_t map_dxdy{map_waypoints_dx, map_waypoints_dy};
+  PathPlanner::points_1d_t map_s{map_waypoints_s};
+
+  // Instantiate our path planner
+  PathPlanner pp(map_xy, map_dxdy, map_s, delta_t);
 
   h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,
-               &map_waypoints_dx,&map_waypoints_dy]
+               &map_waypoints_dx,&map_waypoints_dy,&pp]
               (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
@@ -78,12 +87,12 @@ int main() {
           double car_yaw = j[1]["yaw"];
           double car_speed = j[1]["speed"];
 
+          PathPlanner::Pose current_pose{car_x, car_y, car_s, car_d, car_yaw, car_speed};
+
           // Previous path data given to the Planner
-          auto previous_path_x = j[1]["previous_path_x"];
-          auto previous_path_y = j[1]["previous_path_y"];
+          PathPlanner::points_2d_t previous{j[1]["previous_path_x"], j[1]["previous_path_y"]};
           // Previous path's end s and d values
-          double end_path_s = j[1]["end_path_s"];
-          double end_path_d = j[1]["end_path_d"];
+          PathPlanner::point_t path_end{j[1]["end_path_s"], j[1]["end_path_d"]};
 
           // Sensor Fusion Data, a list of all other cars on the same side
           //   of the road.
@@ -91,14 +100,9 @@ int main() {
 
           json msgJson;
 
-          vector<double> next_x_vals;
-          vector<double> next_y_vals;
-
-          /**
-           * TODO: define a path made up of (x,y) points that the car will visit
-           *   sequentially every .02 seconds
-           */
-
+           auto next_vals = pp.getNextPath(previous, path_end, current_pose, sensor_fusion);
+           vector<double> next_x_vals = std::move(next_vals.first);
+           vector<double> next_y_vals = std::move(next_vals.second);
 
           msgJson["next_x"] = next_x_vals;
           msgJson["next_y"] = next_y_vals;
