@@ -24,10 +24,15 @@ public:
   points_2d_t getNextPath(const points_2d_t & previous_path, const point_t & path_end, const Pose & current_pose, sensor_fusion_t fusion_results);
 
 private: // constants
+  static constexpr double kMphToMs = 2.237;
   static constexpr unsigned kNumPoints = 50;
+  static constexpr double kMaxVelocity = 49.5 / kMphToMs;
+  static constexpr double kMaxAcceleration = 10; // m/s^2
+  static constexpr double kMaxJerk = 10; // m/s^3
 
 private: // methods
   point_t generatePointAheadFrenet(point_t point, double velocity);
+  static double updateKinematics(double current, double target, double limit, double delta_t);
 
 private: // members
   const points_2d_t map_xy_;
@@ -35,7 +40,11 @@ private: // members
   const points_1d_t map_s_;
   const double delta_t_;
 
-  double desired_velocity_{49.5 / 2.24};
+  double target_velocity_{kMaxVelocity};
+  double current_velocity_{0.0};
+
+  double target_acceleration_{kMaxAcceleration};
+  double current_acceleration_{0.0};
 };
 
 #endif // PATH_PLANNER_HPP
