@@ -7,7 +7,6 @@
 #include "Eigen-3.3/Eigen/QR"
 #include "helpers.h"
 #include "json.hpp"
-#include "spline.h"
 
 #include "path_planner.hpp"
 
@@ -87,12 +86,12 @@ int main() {
           double car_yaw = j[1]["yaw"];
           double car_speed = j[1]["speed"];
 
-          PathPlanner::Pose current_pose{car_x, car_y, car_s, car_d, car_yaw, car_speed};
+          PathPlanner::Pose current_pose{car_x, car_y, car_s, car_d, car_yaw * 2.0 * M_PI / 360.0, car_speed};
 
           // Previous path data given to the Planner
           PathPlanner::points_2d_t previous{j[1]["previous_path_x"], j[1]["previous_path_y"]};
           // Previous path's end s and d values
-          PathPlanner::point_t path_end{j[1]["end_path_s"], j[1]["end_path_d"]};
+          PathPlanner::point_2d_t path_end{j[1]["end_path_s"], j[1]["end_path_d"]};
 
           // Sensor Fusion Data, a list of all other cars on the same side
           //   of the road.
