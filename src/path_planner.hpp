@@ -46,9 +46,9 @@ private: // constants
   static constexpr double kMaxAcceleration = 5; // m/s^2
   static constexpr double kMaxJerk = 5; // m/s^3
   static constexpr double kLaneWidth = 4; // m/s
-  static constexpr double kSplineDistanceHorizon = 30.0; // m
   static constexpr double kSplineAnchorDistanceInterval = 30.0; // m
   static constexpr unsigned kSplineNumPoints = 3;
+  static constexpr double kSplineDistanceHorizon = kSplineNumPoints * kSplineAnchorDistanceInterval; // m
   static constexpr double kBrakingMargin = 0.0;
 
 private: // methods
