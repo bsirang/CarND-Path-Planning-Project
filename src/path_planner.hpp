@@ -47,13 +47,15 @@ private: // constants
   static constexpr double kMaxJerk = 5; // m/s^3
   static constexpr double kLaneWidth = 4; // m/s
   static constexpr double kSplineDistanceHorizon = 30.0; // m
-  static constexpr double kProxThresholdMin = 30.0;
-  static constexpr double kProxThresholdMax = 50.0;
+  static constexpr double kSplineAnchorDistanceInterval = 30.0; // m
+  static constexpr unsigned kSplineNumPoints = 3;
+  static constexpr double kBrakingMargin = 0.0;
 
 private: // methods
   static double updateKinematics(double current, double target, double limit, double delta_t);
   static unsigned getCurrentLaneNo(const Pose & current_pose);
   static double getLaneCenterPositionOfCurrentLane(const Pose & current_pose);
+  static double getCenterPositionOfLane(unsigned int lane_no);
   static point_2d_t mapFrameToCarFrame(point_2d_t map_coord, const Pose & current_pose);
   static point_2d_t carFrameToMapFrame(point_2d_t car_coord, const Pose & current_pose);
 
@@ -63,6 +65,7 @@ private: // methods
   tk::spline generateSpline(const points_2d_t & previous_path, const Pose & current_pose);
   points_2d_t generateNextPathFromSpline(const tk::spline & s, const points_2d_t & previous_path, const Pose & current_pose);
   void proximityDetector(const std::vector<Object> & objects, const Pose & current_pose);
+  double calculateBrakingDistance();
 
 private: // members
   const points_2d_t map_xy_;
@@ -75,6 +78,8 @@ private: // members
 
   double target_acceleration_{kMaxAcceleration};
   double current_acceleration_{0.0};
+
+  unsigned int desired_lane_{1};
 };
 
 #endif // PATH_PLANNER_HPP

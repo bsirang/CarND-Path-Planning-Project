@@ -71,11 +71,10 @@ tk::spline PathPlanner::generateSpline(const points_2d_t & previous_path, const 
     input_points_xy.second.push_back(current_pose.y);
   }
 
-  // At this point we have our first two points, let's generate a few more
-  static constexpr double increment = 30.0;
-  for (size_t i = 0; i < 3; ++i) {
-    double s = current_pose.s + (i + 1) * increment;
-    double d = getLaneCenterPositionOfCurrentLane(current_pose);
+  // At this point we have our first two points, let's generate some more
+  for (size_t i = 0; i < kSplineNumPoints; ++i) {
+    double s = current_pose.s + (i + 1) * kSplineAnchorDistanceInterval;
+    double d = getCenterPositionOfLane(desired_lane_);
     point_2d_t point{s, d};
     auto waypoint = getXYFromFrenet(point);
     input_points_xy.first.push_back(waypoint.first);
@@ -107,12 +106,10 @@ void PathPlanner::proximityDetector(const std::vector<Object> & objects, const P
     unsigned int lane = getCurrentLaneNo(p);
     if (lane == current_lane) {
       double distance = p.s - current_pose.s;
-      if (distance > 0.0 && distance < kProxThresholdMax) {
-        if (distance < kProxThresholdMin) {
-          speed_reduction_factor = (kProxThresholdMin - distance) / 30.0;
-        } else {
-          speed_reduction_factor = 1.0;
-        }
+      double braking_distance = calculateBrakingDistance();
+      double threshold = (braking_distance + kBrakingMargin);
+      if (distance > 0.0 && distance < threshold) {
+        speed_reduction_factor = (threshold - distance) / threshold;
         double speed = speed_reduction_factor * p.speed;
         if (speed < new_speed) {
           new_speed = speed;
@@ -191,7 +188,7 @@ PathPlanner::point_2d_t PathPlanner::generatePointAheadFrenet(point_2d_t point, 
 }
 
 double PathPlanner::getLaneCenterPositionOfCurrentLane(const Pose & current_pose) {
-  return (getCurrentLaneNo(current_pose) * kLaneWidth) + (kLaneWidth / 2.0);
+  return getCenterPositionOfLane(getCurrentLaneNo(current_pose));
 }
 
 unsigned PathPlanner::getCurrentLaneNo(const Pose & current_pose) {
@@ -202,6 +199,10 @@ unsigned PathPlanner::getCurrentLaneNo(const Pose & current_pose) {
     lane_no++;
   }
   return lane_no;
+}
+
+double PathPlanner::getCenterPositionOfLane(unsigned int lane_no) {
+  return (lane_no * kLaneWidth) + (kLaneWidth / 2.0);
 }
 
 PathPlanner::point_2d_t PathPlanner::getXYFromFrenet(point_2d_t frenet) const {
@@ -234,4 +235,8 @@ PathPlanner::point_2d_t PathPlanner::carFrameToMapFrame(point_2d_t car_coord, co
   x += current_pose.x;
   y += current_pose.y;
   return {x, y};
+}
+
+double PathPlanner::calculateBrakingDistance() {
+  return (current_velocity_ * current_velocity_) / (2.0 * kMaxAcceleration);
 }
