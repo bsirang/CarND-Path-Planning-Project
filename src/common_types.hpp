@@ -37,22 +37,22 @@ using sensor_fusion_t = std::vector<std::vector<double>>;
 constexpr double kMphToMs = 2.23694;
 constexpr unsigned kNumPoints = 50;
 constexpr double kMaxVelocity = 49.5 / kMphToMs;
-constexpr double kMaxAcceleration = 9.5; // m/s^2
-constexpr double kMaxJerk = 5; // m/s^3
+constexpr double kMaxAcceleration = 9; // m/s^2
+constexpr double kMaxJerk = 9; // m/s^3
 constexpr double kLaneWidth = 4; // m/s
 constexpr double kSplineAnchorDistanceInterval = 60.0; // m
 constexpr unsigned kSplineNumPoints = 3;
 constexpr double kSplineDistanceHorizon = 30.0; // m
 constexpr double kCarWidth = 3.0; // m
 constexpr lane_t kInitialLane = 1; // from simulator
-constexpr double kBrakingMargin = 10.0; // m
+constexpr double kBrakingMargin = 5.0; // m
 
 constexpr double kProjectAheadTime = 3.0; // sec
-constexpr double kOccupancyWindow = 6.0; // m
+constexpr double kOccupancyWindow = 12.0; // m
 constexpr double kObjectAheadThreshold = 30.0; // m
 constexpr double kLaneChangeBaseCost = 0.10;
 constexpr double kLaneOccupiedBaseCost = 0.75;
-constexpr unsigned kPrepareChangeThreshold = 7;
+constexpr unsigned kPrepareChangeThreshold = 10;
 }
 
 #endif // COMMON_TYPES_HPP
