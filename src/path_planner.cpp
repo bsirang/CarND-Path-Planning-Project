@@ -1,4 +1,5 @@
 #include "path_planner.hpp"
+#include "utilities.hpp"
 #include "helpers.h"
 
 #include <string>
@@ -6,9 +7,31 @@
 #include <stdexcept>
 #include <iostream>
 
+using namespace Common::Utilities;
+using namespace Common;
+
 PathPlanner::PathPlanner(const points_2d_t & map_xy, const points_2d_t & map_dxdy, const points_1d_t & map_s, double delta_t) : map_xy_{map_xy}, map_dxdy_{map_dxdy}, map_s_{map_s}, delta_t_{delta_t} {}
 
 PathPlanner::points_2d_t PathPlanner::getNextPath(const points_2d_t & previous_path, const point_2d_t & path_end, const Pose & current_pose, sensor_fusion_t fusion_results) {
+
+  sanityCheckPreviousPath(previous_path);
+  std::vector<Object> other_cars = getObjectVectorFromSensorFusion(fusion_results);
+
+  // First run the proximity detector to adjust our velocity if need be
+  proximityDetector(other_cars, current_pose);
+
+  auto target_lane = bp_.getDesiredLane(current_pose, other_cars);
+
+  // Then generate a spline based on where our previous path left off
+  // and projecting forward into our desired lane
+  auto spline = generateSpline(previous_path, current_pose, target_lane);
+  points_2d_t new_points = generateNextPathFromSpline(spline, previous_path, current_pose);
+
+  last_target_lane_ = target_lane;
+  return new_points;
+}
+
+void PathPlanner::sanityCheckPreviousPath(const points_2d_t & previous_path) {
   if (previous_path.first.size() != previous_path.second.size()) {
     std::stringstream msg;
     msg << "Previous path vectors must be of equal length! (" << previous_path.first.size() <<
@@ -22,30 +45,9 @@ PathPlanner::points_2d_t PathPlanner::getNextPath(const points_2d_t & previous_p
     msg << "Previous path has more points than expected! " << prev_path_size << " > " << kNumPoints;
     throw std::runtime_error(msg.str());
   }
-
-  unsigned current_lane = getCurrentLaneNo(current_pose);
-  std::vector<Object> other_cars;
-  for (const auto & result : fusion_results) {
-    Object o;
-    o.id = result[0];
-    o.x = result[1];
-    o.y = result[2];
-    o.vx = result[3];
-    o.vy = result[4];
-    o.s = result[5];
-    o.d = result[6];
-    other_cars.push_back(o);
-    // std::cout << "id = " << o.id << " d = " << o.d << " speed = " << ::sqrt(o.vx*o.vx+o.vy*o.vy) << std::endl;
-  }
-  proximityDetector(other_cars, current_pose);
-
-  auto spline = generateSpline(previous_path, current_pose);
-  points_2d_t new_points = generateNextPathFromSpline(spline, previous_path, current_pose);
-
-  return new_points;
 }
 
-tk::spline PathPlanner::generateSpline(const points_2d_t & previous_path, const Pose & current_pose) {
+tk::spline PathPlanner::generateSpline(const points_2d_t & previous_path, const Pose & current_pose, lane_t target_lane) {
   // First let's gather some points for our spline. We'll use the previous two
   // points and then project a few more points out into the distance along
   // our current lane
@@ -73,8 +75,9 @@ tk::spline PathPlanner::generateSpline(const points_2d_t & previous_path, const 
 
   // At this point we have our first two points, let's generate some more
   for (size_t i = 0; i < kSplineNumPoints; ++i) {
+    auto lane = (i == 0) ? last_target_lane_ : target_lane;
     double s = current_pose.s + (i + 1) * kSplineAnchorDistanceInterval;
-    double d = getCenterPositionOfLane(desired_lane_);
+    double d = getCenterPositionOfLane(last_target_lane_);
     point_2d_t point{s, d};
     auto waypoint = getXYFromFrenet(point);
     input_points_xy.first.push_back(waypoint.first);
@@ -106,10 +109,9 @@ void PathPlanner::proximityDetector(const std::vector<Object> & objects, const P
     unsigned int lane = getCurrentLaneNo(p);
     if (lane == current_lane) {
       double distance = p.s - current_pose.s;
-      double braking_distance = calculateBrakingDistance();
-      double threshold = (braking_distance + kBrakingMargin);
-      if (distance > 0.0 && distance < threshold) {
-        speed_reduction_factor = (threshold - distance) / threshold;
+      double braking_distance = std::max(calculateBrakingDistance() + kBrakingMargin, 0.0);
+      if (distance > 0.0 && distance < braking_distance) {
+        speed_reduction_factor = (braking_distance - distance) / braking_distance;
         double speed = speed_reduction_factor * p.speed;
         if (speed < new_speed) {
           new_speed = speed;
@@ -157,8 +159,21 @@ PathPlanner::points_2d_t PathPlanner::generateNextPathFromSpline(const tk::splin
     double N = distance / (delta_t_ * current_velocity_);
     // Distance of each increment along the X axis
     double x_dist_increment = target_x / N;
+
+    // double last_x = next_x;
+    // double last_y = s(last_x);
     next_x += x_dist_increment;
-    const double next_y = s(next_x);
+    double next_y = s(next_x);
+
+    // double delta_x = next_x - last_x;
+    // double delta_y = next_y - last_y;
+    // double dist = ::sqrt(delta_x*delta_x + delta_y*delta_y);
+    // if ( dist > (delta_t_ * current_velocity_)) {
+    //   double reduction = (delta_t_ * current_velocity_) / dist;
+    //   next_x *= reduction;
+    //   next_y = s(next_x);
+    //   // std::cout << "Reduced next_x by " << reduction << std::endl;
+    // }
 
 
     auto xy_transform = carFrameToMapFrame({next_x, next_y}, current_pose);
@@ -170,71 +185,14 @@ PathPlanner::points_2d_t PathPlanner::generateNextPathFromSpline(const tk::splin
   return next_path;
 }
 
-double PathPlanner::updateKinematics(double current, double target, double limit, double delta_t) {
-  double increment = delta_t * limit;
-  double error = target - current;
-  double sign = (error > 0.0) ? 1 : -1;
-  if (::fabs(error) < increment) {
-    current = target;
-  } else {
-    current += increment * sign;
-  }
-  return current;
-}
-
 PathPlanner::point_2d_t PathPlanner::generatePointAheadFrenet(point_2d_t point, double velocity) const {
   // Simply adjust s value by distance given by velocity and delta_t while keeping d constant
   return {point.first + velocity * delta_t_, point.second};
 }
 
-double PathPlanner::getLaneCenterPositionOfCurrentLane(const Pose & current_pose) {
-  return getCenterPositionOfLane(getCurrentLaneNo(current_pose));
-}
-
-unsigned PathPlanner::getCurrentLaneNo(const Pose & current_pose) {
-  double d = current_pose.d;
-  unsigned int lane_no = 0;
-  while (d > kLaneWidth) {
-    d -= kLaneWidth;
-    lane_no++;
-  }
-  return lane_no;
-}
-
-double PathPlanner::getCenterPositionOfLane(unsigned int lane_no) {
-  return (lane_no * kLaneWidth) + (kLaneWidth / 2.0);
-}
-
 PathPlanner::point_2d_t PathPlanner::getXYFromFrenet(point_2d_t frenet) const {
   auto xy = getXY(frenet.first, frenet.second, map_s_, map_xy_.first, map_xy_.second);
   return {xy[0], xy[1]};
-}
-
-PathPlanner::point_2d_t PathPlanner::mapFrameToCarFrame(point_2d_t map_coord, const Pose & current_pose) {
-  auto & x = map_coord.first;
-  auto & y = map_coord.second;
-  auto & origin_x = current_pose.x;
-  auto & origin_y = current_pose.y;
-  auto & origin_yaw = current_pose.yaw;
-  double shift_x = x - origin_x;
-  double shift_y = y - origin_y;
-
-  x = (shift_x * ::cos(-origin_yaw) - shift_y * ::sin(-origin_yaw));
-  y = (shift_x * ::sin(-origin_yaw) + shift_y * ::cos(-origin_yaw));
-  return {x, y};
-}
-
-PathPlanner::point_2d_t PathPlanner::carFrameToMapFrame(point_2d_t car_coord, const Pose & current_pose) {
-  double x_ref = car_coord.first;
-  double y_ref = car_coord.second;
-  double ref_yaw = current_pose.yaw;
-
-  double x = x_ref * ::cos(ref_yaw) - y_ref * ::sin(ref_yaw);
-  double y = x_ref * ::sin(ref_yaw) + y_ref * ::cos(ref_yaw);
-
-  x += current_pose.x;
-  y += current_pose.y;
-  return {x, y};
 }
 
 double PathPlanner::calculateBrakingDistance() {
