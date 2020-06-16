@@ -34,7 +34,7 @@ private: // methods
 
   tk::spline generateSpline(const points_2d_t & previous_path, const Pose & current_pose, lane_t target_lane);
   points_2d_t generateNextPathFromSpline(const tk::spline & s, const points_2d_t & previous_path, const Pose & current_pose);
-  void proximityDetector(const std::vector<Object> & objects, const Pose & current_pose);
+  void proximityDetector(lane_t target_lane, const std::vector<Object> & objects, const Pose & current_pose);
   double calculateBrakingDistance();
 
 private: // members

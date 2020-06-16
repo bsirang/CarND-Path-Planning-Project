@@ -18,7 +18,7 @@ PathPlanner::points_2d_t PathPlanner::getNextPath(const points_2d_t & previous_p
   std::vector<Object> other_cars = getObjectVectorFromSensorFusion(fusion_results);
 
   // First run the proximity detector to adjust our velocity if need be
-  proximityDetector(other_cars, current_pose);
+  proximityDetector(last_target_lane_, other_cars, current_pose);
 
   auto target_lane = bp_.getDesiredLane(current_pose, other_cars);
 
@@ -100,8 +100,8 @@ tk::spline PathPlanner::generateSpline(const points_2d_t & previous_path, const 
   return s;
 }
 
-void PathPlanner::proximityDetector(const std::vector<Object> & objects, const Pose & current_pose) {
-  unsigned int current_lane = getCurrentLaneNo(current_pose);
+void PathPlanner::proximityDetector(lane_t target_lane, const std::vector<Object> & objects, const Pose & current_pose) {
+  unsigned int current_lane = target_lane;
   double new_speed = kMaxVelocity;
   double speed_reduction_factor = 1.0;
   for (const auto & object : objects) {

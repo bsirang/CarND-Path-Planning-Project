@@ -18,7 +18,7 @@ double updateKinematics(double current, double target, double limit, double delt
   return current;
 }
 
-unsigned getCurrentLaneNo(const Pose & current_pose) {
+lane_t getCurrentLaneNo(const Pose & current_pose) {
   double d = current_pose.d;
   unsigned int lane_no = 0;
   while (d > kLaneWidth) {

@@ -45,9 +45,9 @@ constexpr unsigned kSplineNumPoints = 3;
 constexpr double kSplineDistanceHorizon = 30.0; // m
 constexpr double kCarWidth = 3.0; // m
 constexpr lane_t kInitialLane = 1; // from simulator
-constexpr double kBrakingMargin = 5.0; // m
+constexpr double kBrakingMargin = 10.0; // m
 
-constexpr double kProjectAheadTime = 3.0; // sec
+constexpr double kProjectAheadTime = 1.0; // sec
 constexpr double kOccupancyWindow = 12.0; // m
 constexpr double kObjectAheadThreshold = 30.0; // m
 constexpr double kLaneChangeBaseCost = 0.10;
