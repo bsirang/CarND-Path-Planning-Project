@@ -40,16 +40,19 @@ Given the constrained environment of a freeway, we can break down our behavior i
 The transitions between these states are determined by a cost function.
 
 #### Cost Function
-The job of the cost function is to decide which lane is best to be in for any given moment in time. The cost function as implemented in this project represents the following logic as written out in plain english:
+The job of the cost function is to decide which lane is best to be in for any given moment in time. Here is the description of the cost function as currently implemented, written in plain english:
 
 * Even if the lane adjacent to me is traveling ever so slightly faster, I shouldn't immediately change lanes because there is some burden to change lanes to begin with.
 * If I am going the speed limit in my current lane, I have no incentive to change lanes.
 * If I am going slower than the speed limit, I should consider changing lanes.
-* I shouldn't change lanes if there is a vehicle too close in the neighboring lane.
-* I should analyze the speed of traffic in the adjacent lanes, and change lanes only if the relative speed of the other lane is great enough to be "worth it".
+* I shouldn't change lanes if there is a vehicle too close in the neighboring lane based on a projection of myself and neighboring vehicles a couple seconds into the future, and based on an occupancy window matching my "s" value and +/- a threshold.
+* I should analyze the speed of traffic in the adjacent lanes, and change lanes only if the relative speed of the other lane is not just great enough, but great enough to overcome the baseline cost of changing lanes.
 
 ## Shortcomings and Potential Improvements
 While there are some shortcomings identified, they haven't actually caused issues in the simulation environment and don't affect the ability to meet the requirements of this project.
+
+### Initial lane change
+Due to the fact that the cost function primarily uses current speed as an input, there's a side effect where the cost function decides the vehicle should change lanes when the vehicle is initially accelerating from the very beginning. This didn't detract from the overall goal of the path planner so it wasn't addressed.
 
 ### All or nothing lane change
 After the planner decides to change lanes, it is fully committed and doesn't react to any potential sudden changes to vehicles in the existing lane. This can be remedied by a more robust proximity detector and additional edges in the state machine (such as a transition from a change lane state back to a keep lane state).
