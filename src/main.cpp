@@ -89,9 +89,13 @@ int main() {
           PathPlanner::Pose current_pose{car_x, car_y, car_s, car_d, car_yaw * 2.0 * M_PI / 360.0, car_speed / 2.23694};
 
           // Previous path data given to the Planner
-          PathPlanner::points_2d_t previous{j[1]["previous_path_x"], j[1]["previous_path_y"]};
+          std::vector<double> prev_x = j[1]["previous_path_x"];
+          std::vector<double> prev_y = j[1]["previous_path_y"];
+          PathPlanner::points_2d_t previous{prev_x, prev_y};
           // Previous path's end s and d values
-          PathPlanner::point_2d_t path_end{j[1]["end_path_s"], j[1]["end_path_d"]};
+          double end_s = j[1]["end_path_s"];
+          double end_d = j[1]["end_path_d"];
+          PathPlanner::point_2d_t path_end{end_s, end_d};
 
           // Sensor Fusion Data, a list of all other cars on the same side
           //   of the road.
